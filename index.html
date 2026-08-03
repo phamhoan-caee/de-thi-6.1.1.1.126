@@ -339,6 +339,27 @@
         synth.speak(msg);
     }
 
+    // Logic kiểm soát gian lận khi rời khỏi màn hình làm bài
+    document.addEventListener("visibilitychange", function() {
+        if (document.hidden && !isSubmitted && document.getElementById('quiz-screen').style.display === 'grid') {
+            cheatCount++;
+            const msgEl = document.getElementById('cheat-count-msg');
+            if (msgEl) msgEl.innerText = `Lần vi phạm: ${cheatCount}/3`;
+            document.getElementById('warning-overlay').style.display = 'flex';
+            playWarningAI(cheatCount);
+
+            if (cheatCount >= 3) {
+                setTimeout(() => {
+                    finalizeSubmission();
+                }, 2000);
+            }
+        } else {
+            if (cheatCount < 3) {
+                document.getElementById('warning-overlay').style.display = 'none';
+            }
+        }
+    });
+
     function preloadQuestions() {
         const jobSelect = document.getElementById('jobType');
         if (!jobSelect) return;
@@ -512,6 +533,19 @@
     function openConfirmModal() { if (isSubmitted) return; document.getElementById('confirm-modal-overlay').style.display = 'flex'; }
     function closeConfirmModal() { document.getElementById('confirm-modal-overlay').style.display = 'none'; }
 
+    function startResultCountdown() {
+        let count = 15;
+        const timerEl = document.getElementById('countdown');
+        const countInterval = setInterval(() => {
+            count--;
+            if (timerEl) timerEl.innerText = count;
+            if (count <= 0) {
+                clearInterval(countInterval);
+                window.location.reload();
+            }
+        }, 1000);
+    }
+
     async function finalizeSubmission() {
         if (isSubmitted) return;
         isSubmitted = true;
@@ -540,7 +574,8 @@
         
         let dobShow = document.getElementById('studentDOB').dataset.formatted;
         if(!dobShow) {
-            const d = new Date(document.getElementById('studentDOB').value || new Date());
+            const dobVal = document.getElementById('studentDOB').value;
+            const d = dobVal ? new Date(dobVal) : new Date();
             dobShow = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
         }
         
@@ -562,6 +597,8 @@
         if(badge) badge.innerText = score10 + " ĐIỂM";
         document.getElementById('result-screen').style.display = 'flex';
 
+        startResultCountdown();
+
         const formData = new URLSearchParams();
         formData.append('maThi', document.getElementById('maThi').value.trim());
         formData.append('name', document.getElementById('studentName').value.toUpperCase());
@@ -572,36 +609,12 @@
         formData.append('ngheName', isOnTap ? jobName + " (ÔN TẬP)" : jobName);
         formData.append('khoaThi', document.getElementById('khoaThi').value);
 
-        try { await fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: formData }); } catch (e) {}
-        
-        let c = 15;
-        const cd = setInterval(() => { 
-            if(c > 0) { c--; document.getElementById('countdown').innerText = c; }
-            else { clearInterval(cd); location.reload(); }
-        }, 1000);
+        try { 
+            await fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: formData });
+        } catch(e) {
+            console.error("Lỗi gửi dữ liệu:", e);
+        }
     }
-
-    document.addEventListener("visibilitychange", function() {
-        const quizScreen = document.getElementById('quiz-screen'); 
-        if (document.visibilityState === 'hidden' && quizScreen.style.display === 'grid' && !isSubmitted) {
-            cheatCount++;
-            document.getElementById('warning-overlay').style.display = 'flex';
-            document.getElementById('cheat-count-msg').innerText = `Vi phạm lần: ${cheatCount}/3`;
-            playWarningAI(cheatCount);
-            if (cheatCount >= 3) {
-                setTimeout(() => { finalizeSubmission(); }, 1500);
-            }
-        }
-    });
-    window.onfocus = () => { 
-        if (!isSubmitted && cheatCount < 3) {
-            stopSpeaking();
-            document.getElementById('warning-overlay').style.display = 'none';
-            if(selectedQuestions[currentQuestionIndex]) {
-                aiSpeakQuestion(selectedQuestions[currentQuestionIndex], currentQuestionIndex);
-            }
-        }
-    };
 </script>
 </body>
 </html>
