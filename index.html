@@ -46,7 +46,7 @@
         .bg-may-rai { background-image: url('https://raw.githubusercontent.com/phamhoan-caee/DE-T-HI-10.5.26/main/bg-may-rai.jpg'); }
 
         .welcome-container, #quiz-content, .sidebar-right > div, #ai-container, .confirm-modal-content {
-            background: rgba(255, 255, 255, 0.75) !important;
+            background: rgba(255, 255, 255, 0.85) !important;
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); 
             border: 1px solid rgba(255, 255, 255, 0.4);
@@ -208,7 +208,7 @@
                 <input type="checkbox" id="modeToggle" style="width:20px; height:20px; cursor: pointer;">
                 <label for="modeToggle" style="cursor:pointer; font-weight: 700; color: #0d47a1;">Chế độ ôn tập</label>
             </div>
-            <button class="btn-start" id="btnStart" onclick="validateAndStart()">VÀO THI NGAY ➔</button>
+            <button class="btn-start" id="btnStart" onclick="validateAndStart()">ĐANG TẢI ĐỀ THI...</button>
         </div>
     </div>
 
@@ -292,7 +292,7 @@
             if(icon) icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
         } else {
             if(btn) btn.classList.add('muted');
-            if(icon) icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+            if(icon) icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
             stopSpeaking(); 
         }
     }
@@ -339,7 +339,6 @@
         synth.speak(msg);
     }
 
-    // Logic kiểm soát gian lận khi rời khỏi màn hình làm bài
     document.addEventListener("visibilitychange", function() {
         if (document.hidden && !isSubmitted && document.getElementById('quiz-screen').style.display === 'grid') {
             cheatCount++;
@@ -360,7 +359,22 @@
         }
     });
 
+    function getProp(obj, propNames) {
+        if (!obj) return "";
+        for (let name of propNames) {
+            for (let key in obj) {
+                if (key.trim().toLowerCase() === name.toLowerCase()) {
+                    return obj[key];
+                }
+            }
+        }
+        return "";
+    }
+
     function preloadQuestions() {
+        const btn = document.getElementById('btnStart');
+        if (btn) { btn.disabled = true; btn.innerText = "ĐANG TẢI ĐỀ THI..."; }
+        
         const jobSelect = document.getElementById('jobType');
         if (!jobSelect) return;
         const gid = jobSelect.value;
@@ -374,21 +388,50 @@
         else if (selectedText.includes("MÁY XÚC")) body.classList.add('bg-may-xuc');
         else if (selectedText.includes("MÁY RẢI")) body.classList.add('bg-may-rai');
 
+        allQuestions = [];
+
         Papa.parse(BASE_CSV_URL + gid, {
             download: true, header: true, skipEmptyLines: true,
             complete: function(results) {
-                allQuestions = results.data.filter(i => i.CauHoi).map(i => ({
-                    question: i.CauHoi, 
-                    options: [i.A, i.B, i.C, i.D].filter(o => o),
-                    answer: i.DapAnDung ? i.DapAnDung.trim().toUpperCase() : "",
-                    explanation: i.Giaithich || "Vui lòng tuân thủ quy trình vận hành an toàn máy thi công.",
-                    image: i["HINH ANH"] || "" 
-                }));
+                allQuestions = results.data.map(i => {
+                    const qText = getProp(i, ["CauHoi", "Cau Hoi", "cauhoi", "CÂU HỎI"]);
+                    const optA = getProp(i, ["A", "a"]);
+                    const optB = getProp(i, ["B", "b"]);
+                    const optC = getProp(i, ["C", "c"]);
+                    const optD = getProp(i, ["D", "d"]);
+                    const ans = getProp(i, ["DapAnDung", "DapAn", "dapandung", "ĐÁP ÁN"]);
+                    const exp = getProp(i, ["Giaithich", "Giải thích", "giaithich"]);
+                    const img = getProp(i, ["HINH ANH", "HINHANH", "hinh anh", "Hình ảnh"]);
+
+                    if (!qText) return null;
+
+                    return {
+                        question: qText,
+                        options: [optA, optB, optC, optD].filter(o => o && o.toString().trim() !== ""),
+                        answer: ans ? ans.toString().trim().toUpperCase() : "",
+                        explanation: exp || "Vui lòng tuân thủ quy trình vận hành an toàn máy thi công.",
+                        image: img || ""
+                    };
+                }).filter(q => q !== null);
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "VÀO THI NGAY ➔";
+                }
+            },
+            error: function(err) {
+                alert("Lỗi tải đề thi từ Google Sheets. Vui lòng thử lại!");
+                if (btn) { btn.disabled = false; btn.innerText = "THỬ LẠI"; }
             }
         });
     }
 
     async function validateAndStart() {
+        if (allQuestions.length === 0) {
+            alert("Đề thi chưa tải xong hoặc không có câu hỏi nào. Vui lòng chờ vài giây hoặc chọn lại nghề!");
+            return;
+        }
+
         const maThi = document.getElementById('maThi').value.trim();
         const name = document.getElementById('studentName').value.trim();
         const dobInput = document.getElementById('studentDOB').value;
@@ -423,7 +466,10 @@
 
     function startQuiz() {
         document.getElementById('display-name').innerText = document.getElementById('studentName').value.toUpperCase();
-        selectedQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 25); 
+        
+        const total = allQuestions.length;
+        selectedQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, Math.min(25, total)); 
+        
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('ai-container').style.display = 'flex';
         document.getElementById('timer').style.display = 'inline-block';
@@ -455,7 +501,7 @@
         
         html += `<div class="action-buttons" style="display:flex; justify-content:space-between; margin-top:20px; gap:15px;">
                     <button class="btn-start" style="background:var(--btn-blue); flex:1;" onclick="showQuestion(${idx-1})" ${idx===0?'disabled':''}>Lùi lại</button>
-                    ${idx === 24 
+                    ${idx === selectedQuestions.length - 1 
                         ? `<button class="btn-start" style="background:var(--success); flex:1;" onclick="openConfirmModal()">Hoàn thành & Nộp bài</button>`
                         : `<button class="btn-start" style="background:var(--btn-blue); flex:1;" onclick="showQuestion(${idx+1})">Tiếp theo</button>`
                     }
@@ -505,8 +551,9 @@
 
     function updateProgressBar() {
         const completed = studentAnswers.length;
-        document.getElementById('progress-fill').style.width = (completed / 25 * 100) + "%";
-        document.getElementById('progress-text').innerText = completed + "/25";
+        const total = selectedQuestions.length || 25;
+        document.getElementById('progress-fill').style.width = (completed / total * 100) + "%";
+        document.getElementById('progress-text').innerText = completed + "/" + total;
     }
 
     function renderGrid() {
@@ -567,8 +614,9 @@
             if(ans && ans.selectedLabel === q.answer) score++;
         });
 
-        const score10 = parseFloat((score * (10 / 25)).toFixed(1));
-        const status = score >= 21 ? "ĐẠT" : "KHÔNG ĐẠT"; 
+        const totalQ = selectedQuestions.length || 25;
+        const score10 = parseFloat((score * (10 / totalQ)).toFixed(1));
+        const status = score >= Math.ceil(totalQ * 0.84) ? "ĐẠT" : "KHÔNG ĐẠT"; 
         const jobName = document.getElementById('jobType').options[document.getElementById('jobType').selectedIndex].text;
         const isOnTap = document.getElementById('modeToggle').checked;
         
@@ -603,7 +651,7 @@
         formData.append('maThi', document.getElementById('maThi').value.trim());
         formData.append('name', document.getElementById('studentName').value.toUpperCase());
         formData.append('birthDate', dobShow);
-        formData.append('score', score + "/25");
+        formData.append('score', score + "/" + totalQ);
         formData.append('status', status);
         formData.append('viPham', cheatCount);
         formData.append('ngheName', isOnTap ? jobName + " (ÔN TẬP)" : jobName);
